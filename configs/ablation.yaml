@@ -1,0 +1,135 @@
+# ==============================================================================
+# Fovea-LiDAR Ablation Configurations (Project Brief Section 34)
+# ==============================================================================
+# Defines the 5 standardized ablation study modes as named configuration overlays.
+# All modes run through the exact same FoveaPipeline and AdaptiveGridEngine codebase,
+# ensuring rigorous and fair apples-to-apples performance comparisons.
+# ==============================================================================
+
+# Mode 1: Uniform High-Resolution Baseline
+# Forces a single uniform resolution zone covering the whole sensor range (0-100m)
+# at the finest resolution (0.05m), with all dynamic foveation toggles disabled.
+mode_1_uniform:
+  resolution_zones:
+    - name: "uniform_fine"
+      distance_min: 0.0
+      distance_max: 100.0
+      target_resolution: 0.05
+  semantic_foveation:
+    enabled: false
+  risk_refinement:
+    enabled: false
+  uncertainty_refinement:
+    enabled: false
+
+# Mode 2: Distance-Only Multi-Resolution Grid
+# Concentric distance zones as configured in default.yaml, with all dynamic
+# semantic, risk, and uncertainty refinement triggers disabled.
+mode_2_distance_only:
+  resolution_zones:
+    - name: "fovea"
+      distance_min: 0.0
+      distance_max: 10.0
+      target_resolution: 0.05
+    - name: "mid_range"
+      distance_min: 10.0
+      distance_max: 25.0
+      target_resolution: 0.10
+    - name: "far_field"
+      distance_min: 25.0
+      distance_max: 50.0
+      target_resolution: 0.25
+    - name: "periphery"
+      distance_min: 50.0
+      distance_max: 100.0
+      target_resolution: 0.40
+  semantic_foveation:
+    enabled: false
+  risk_refinement:
+    enabled: false
+  uncertainty_refinement:
+    enabled: false
+
+# Mode 3: Distance + Semantic Foveation
+# Concentric distance zones + object/semantic foveation enabled;
+# risk and uncertainty triggers remain disabled.
+mode_3_distance_semantic:
+  resolution_zones:
+    - name: "fovea"
+      distance_min: 0.0
+      distance_max: 10.0
+      target_resolution: 0.05
+    - name: "mid_range"
+      distance_min: 10.0
+      distance_max: 25.0
+      target_resolution: 0.10
+    - name: "far_field"
+      distance_min: 25.0
+      distance_max: 50.0
+      target_resolution: 0.25
+    - name: "periphery"
+      distance_min: 50.0
+      distance_max: 100.0
+      target_resolution: 0.40
+  semantic_foveation:
+    enabled: true
+  risk_refinement:
+    enabled: false
+  uncertainty_refinement:
+    enabled: false
+
+# Mode 4: Distance + Semantic + Collision Risk Refinement
+# Semantic foveation and kinematic risk-driven foveation enabled;
+# uncertainty-based refinement remains disabled.
+mode_4_distance_semantic_risk:
+  resolution_zones:
+    - name: "fovea"
+      distance_min: 0.0
+      distance_max: 10.0
+      target_resolution: 0.05
+    - name: "mid_range"
+      distance_min: 10.0
+      distance_max: 25.0
+      target_resolution: 0.10
+    - name: "far_field"
+      distance_min: 25.0
+      distance_max: 50.0
+      target_resolution: 0.25
+    - name: "periphery"
+      distance_min: 50.0
+      distance_max: 100.0
+      target_resolution: 0.40
+  semantic_foveation:
+    enabled: true
+  risk_refinement:
+    enabled: true
+  uncertainty_refinement:
+    enabled: false
+
+# Mode 5: Full Fovea-LiDAR Adaptive Perception (All Systems Active)
+# Complete multi-signal foveation architecture: concentric zones, semantic
+# foveation, risk refinement, uncertainty refinement, and traversability.
+mode_5_full:
+  resolution_zones:
+    - name: "fovea"
+      distance_min: 0.0
+      distance_max: 10.0
+      target_resolution: 0.05
+    - name: "mid_range"
+      distance_min: 10.0
+      distance_max: 25.0
+      target_resolution: 0.10
+    - name: "far_field"
+      distance_min: 25.0
+      distance_max: 50.0
+      target_resolution: 0.25
+    - name: "periphery"
+      distance_min: 50.0
+      distance_max: 100.0
+      target_resolution: 0.40
+  semantic_foveation:
+    enabled: true
+  risk_refinement:
+    enabled: true
+  uncertainty_refinement:
+    enabled: true

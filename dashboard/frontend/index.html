@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fovea-LiDAR 3D Perception & Voxel Visualizer</title>
+  
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Three.js + OrbitControls (Local offline fallback with CDN fallback) -->
+  <script src="/static/vendor/three.min.js"></script>
+  <script src="/static/vendor/OrbitControls.js"></script>
+  
+  <!-- Global Shared Palette Configuration -->
+  <script src="/static/palette.js?v=20260907_v1"></script>
+
+  <link rel="stylesheet" href="/static/styles.css?v=20260907_dark_unified_v1">
+</head>
+<body class="dark-theme">
+  <div class="app-layout">
+    
+    <!-- Top System Header -->
+    <header class="top-nav">
+      <div class="nav-left">
+        <div class="system-brand">
+          <div class="radar-pulse"></div>
+          <div class="brand-titles">
+            <span class="brand-name">FOVEA-LiDAR</span>
+            <span class="brand-tag">3D ADAPTIVE PERCEPTION & VOXEL ENGINE</span>
+          </div>
+        </div>
+        
+        <div class="connection-pill" id="status-pill">
+          <span class="pill-dot"></span>
+          <span class="pill-label" id="status-text">INITIALIZING</span>
+        </div>
+      </div>
+
+      <!-- Playback Controls -->
+      <div class="nav-center">
+        <div class="playback-controls">
+          <button id="btn-play-pause" class="ctrl-btn primary" title="Play / Pause [Space]">
+            <span id="btn-icon">⏸</span>
+            <span id="btn-label">PAUSE</span>
+          </button>
+          
+          <div class="speed-selector">
+            <button class="speed-btn" data-speed="0.5">0.5x</button>
+            <button class="speed-btn active" data-speed="1.0">1.0x</button>
+            <button class="speed-btn" data-speed="2.0">2.0x</button>
+          </div>
+
+          <div class="timeline-scrubber">
+            <input type="range" id="seek-slider" min="0" max="99" value="0" step="1">
+            <div class="timeline-meta">
+              <span id="frame-counter" class="mono">FRAME 00/100</span>
+              <span id="timestamp-counter" class="mono">(t = 0.00s)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scenario Selector -->
+      <div class="nav-right">
+        <div class="scenario-selector">
+          <label for="scenario-select">SCENARIO:</label>
+          <select id="scenario-select">
+            <option value="flagship_demo">flagship_demo (Jury Walkthrough)</option>
+            <option value="surround_360_city">surround_360_city (360° Omnidirectional Urban)</option>
+            <option value="real_world_highway">real_world_highway (Real Velodyne 64-Beam)</option>
+            <option value="multi_object_dense">multi_object_dense</option>
+            <option value="vehicle_crossing">vehicle_crossing</option>
+            <option value="pedestrian_at_distance">pedestrian_at_distance</option>
+            <option value="empty_road">empty_road</option>
+            <option value="object_disappearing">object_disappearing</option>
+            <option value="low_confidence_obstacle">low_confidence_obstacle</option>
+            <option value="resolution_boundary_stress">resolution_boundary_stress</option>
+            <option value="interactive_drive_demo">🎮 interactive_drive_demo (Free Roam Demo)</option>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <!-- Subheader: 3D Camera Controls & Layer Visibility -->
+    <section class="toolbar-strip">
+      <!-- Primary vs Secondary Operating Mode Switcher -->
+      <div class="tool-group op-mode-group">
+        <span class="tool-group-label">SYSTEM:</span>
+        <button class="tool-btn op-btn active" id="btn-op-inspect" title="Standard LiDAR Sensor Inspection: Stationary Ego, Moving Objects">
+          📡 LiDAR Inspection
+        </button>
+        <button class="tool-btn op-btn" id="btn-op-drive" title="Interactive Vehicle Drive Demo: Movable Ego Car with WASD Controls">
+          🎮 Drive Demo
+        </button>
+      </div>
+
+      <div class="tool-group divider"></div>
+
+      <div class="tool-group">
+        <span class="tool-group-label">CAMERA:</span>
+        <button class="tool-btn" id="cam-chase">🏎️ Chase Cam (Follow Car)</button>
+        <button class="tool-btn" id="cam-ego">🚘 Driver Cockpit</button>
+        <button class="tool-btn" id="cam-bev">🗺️ Bird's-Eye (BEV)</button>
+        <button class="tool-btn active" id="cam-orbit">🌐 3D Free Orbit</button>
+        <button class="tool-btn" id="cam-side">Side Profile</button>
+        <button class="tool-btn" id="cam-reset">Reset</button>
+      </div>
+
+      <div class="tool-group divider"></div>
+
+      <div class="tool-group">
+        <span class="tool-group-label">MAP VIEW:</span>
+        <select id="view-mode-select" class="mini-select mode-highlight">
+          <option value="traversability" selected>1. 🟢 Traversability &amp; Hazard Grid</option>
+          <option value="resolution">2. 🎯 Dynamic Resolution (5cm Fovea Tiers)</option>
+          <option value="semantic">3. 🏷️ Semantic Segmentation Classes</option>
+          <option value="elevation">4. 🌈 Elevation (Turbo Height Map)</option>
+          <option value="intensity">5. ⚡ LiDAR Intensity / Reflectivity</option>
+          <option value="risk">6. ⚠️ Collision Risk &amp; Threat Map</option>
+          <option value="wireframe">7. 📐 3D Wireframe Matrix</option>
+        </select>
+        <!-- Hidden proxy for backward compatibility -->
+
+        <select id="point-color-mode" style="display:none">
+          <option value="semantic">Semantic Classes</option>
+          <option value="elevation">Elevation (Z-Height)</option>
+        </select>
+      </div>
+
+      <div class="tool-group divider"></div>
+
+      <div class="tool-group">
+        <span class="tool-group-label">TUNING:</span>
+        <label class="slider-label" title="LiDAR Point Diameter">
+          <span>Pt Size:</span>
+          <input type="range" id="slider-point-size" min="0.04" max="0.36" step="0.02" value="0.14">
+          <span id="val-point-size" class="mono val-badge">0.14m</span>
+        </label>
+
+        <label class="slider-label" title="Voxel Elevation Extrusion Scale">
+          <span>Voxel H:</span>
+          <input type="range" id="slider-voxel-height" min="0.2" max="2.5" step="0.1" value="1.0">
+          <span id="val-voxel-height" class="mono val-badge">1.0x</span>
+        </label>
+
+        <select id="select-voxel-style" class="mini-select" title="Voxel Mesh Geometry Style">
+          <option value="inset">Pillars + Inset Grid</option>
+          <option value="wireframe">Wireframe Matrix</option>
+          <option value="tiles">Flat Surface Tiles</option>
+        </select>
+      </div>
+
+      <div class="tool-group divider"></div>
+
+      <div class="tool-group">
+        <span class="tool-group-label">LAYERS:</span>
+        <label class="toggle-pill">
+          <input type="checkbox" id="layer-voxels" checked>
+          <span class="toggle-track"></span>
+          <span class="toggle-text">3D Voxels</span>
+        </label>
+        <label class="toggle-pill">
+          <input type="checkbox" id="layer-points" checked>
+          <span class="toggle-track"></span>
+          <span class="toggle-text">Points</span>
+        </label>
+        <label class="toggle-pill">
+          <input type="checkbox" id="layer-bboxes" checked>
+          <span class="toggle-track"></span>
+          <span class="toggle-text">Track Boxes</span>
+        </label>
+        <label class="toggle-pill">
+          <input type="checkbox" id="layer-foveas" checked>
+          <span class="toggle-track"></span>
+          <span class="toggle-text">Foveas</span>
+        </label>
+        <label class="toggle-pill">
+          <input type="checkbox" id="layer-rings" checked>
+          <span class="toggle-track"></span>
+          <span class="toggle-text">Range Rings</span>
+        </label>
+        <label class="toggle-pill">
+          <input type="checkbox" id="layer-grid" checked>
+          <span class="toggle-track"></span>
+          <span class="toggle-text">Ego Vehicle</span>
+        </label>
+      </div>
+
+      <div class="tool-group divider"></div>
+
+      <div class="tool-group">
+        <span class="tool-group-label">PANEL A:</span>
+        <button class="tool-btn active" id="btn-toggle-panel-a" title="Toggle Panel A: 2D Orthographic Top-Down LiDAR Radar Inset">
+          📡 Panel A (BEV)
+        </button>
+      </div>
+
+      <div class="tool-group divider"></div>
+
+      <div class="tool-group">
+        <span class="tool-group-label">THEME:</span>
+        <select id="select-theme" class="mini-select">
+          <option value="dark" selected>🌙 Studio Dark (Recommended)</option>
+          <option value="cyber">⚡ Cyber Neon</option>
+          <option value="light">☀️ Light &amp; Vibrant</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Main Content Workspace -->
+    <main class="workspace-container">
+      
+      <!-- Primary 3D WebGL Canvas Container (Panel C) -->
+      <div class="viewport-3d-wrapper" id="viewport-3d-wrapper">
+        <div id="webgl-canvas-container">
+          <!-- Fallback test anchor for canvas-map -->
+          <canvas id="canvas-map" style="display:none"></canvas>
+        </div>
+
+        <!-- Panel A: Dedicated 2D Orthographic Top-Down LiDAR Radar Viewport -->
+        <div class="panel-a-container" id="panel-a-container">
+          <div class="panel-a-header">
+            <div class="panel-a-title">
+              <span class="panel-a-dot"></span>
+              <span class="panel-a-label">PANEL A: RAW LiDAR (ORTHOGRAPHIC BEV)</span>
+            </div>
+            <div class="panel-a-controls">
+              <span class="panel-a-meta mono" id="panel-a-pt-count">0 pts</span>
+              <button class="panel-a-btn" id="btn-panel-a-size" title="Toggle Size">⛶</button>
+              <button class="panel-a-btn" id="btn-panel-a-close" title="Minimize">✕</button>
+            </div>
+          </div>
+          <div class="panel-a-body">
+            <canvas id="canvas-raw" width="340" height="340"></canvas>
+            
+            <!-- Panel A Reflectance Intensity Colormap Overlay -->
+            <div class="panel-a-intensity-legend">
+              <span class="panel-a-intensity-title">REFLECTANCE</span>
+              <div class="panel-a-intensity-bar"></div>
+              <div class="panel-a-intensity-labels">
+                <span>0.0</span>
+                <span>0.5</span>
+                <span>1.0</span>
+              </div>
+            </div>
+
+            <!-- Canvas scale and axis overlay legend -->
+            <div class="panel-a-legend">
+              <div class="legend-axis">
+                <span class="axis-badge x-axis" title="Longitudinal axis forward">▲ +X (Fwd)</span>
+                <span class="axis-badge y-axis" title="Lateral axis left">◄ +Y (Left)</span>
+              </div>
+              <div class="legend-scale">
+                <span class="scale-bar"></span>
+                <span class="scale-text mono" id="panel-a-scale-text">10m</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel C Dynamic Mode Overlay Legend -->
+        <div class="panel-c-mode-overlay" id="panel-c-mode-overlay">
+          <div class="panel-c-mode-title" id="panel-c-mode-title">
+            <span>🟢 3D TRAVERSABILITY GRID</span>
+          </div>
+          <div class="panel-c-mode-items" id="panel-c-mode-items">
+            <!-- Dynamically populated based on active view mode -->
+          </div>
+        </div>
+        
+        <!-- Viewport Overlays -->
+        <div class="viewport-hint">
+          <span>Left-Click: <b>Orbit</b> | Right-Click: <b>Pan</b> | Scroll: <b>Zoom</b></span>
+        </div>
+
+        <div class="fovea-status-banner" id="fovea-banner">
+          <span class="banner-icon">🎯</span>
+          <span id="fovea-banner-text">FOVEA CONTROLLER IDLE (PERIPHERAL COARSE BASELINE)</span>
+        </div>
+
+        <!-- Interactive Vehicle Driving Cockpit Overlay (Secondary Demo Mode) -->
+        <div class="cockpit-drive-panel hidden" id="cockpit-drive-panel">
+          <!-- Top Telemetry Row -->
+          <div class="cockpit-row-telemetry">
+            <div class="speed-cluster">
+              <span class="speed-label">SPEED</span>
+              <span class="speed-value mono" id="cockpit-speed-kmh">28.8</span>
+              <span class="speed-unit">km/h</span>
+              <span class="speed-sub mono" id="cockpit-speed-ms">(8.0 m/s)</span>
+            </div>
+
+            <div class="gear-cluster">
+              <span class="gear-badge active" id="gear-d">D</span>
+              <span class="gear-badge" id="gear-n">N</span>
+              <span class="gear-badge" id="gear-r">R</span>
+              <span class="gear-badge" id="gear-p">P</span>
+            </div>
+
+            <div class="steer-cluster">
+              <span class="steer-label">STEER</span>
+              <span class="steer-value mono" id="cockpit-steer-deg">0.0°</span>
+            </div>
+
+            <div class="drive-mode-cluster">
+              <button class="mode-pill active" id="btn-mode-manual" title="Manual Drive with WASD / Arrows">🎮 MANUAL DRIVE</button>
+              <button class="mode-pill" id="btn-mode-cruise" title="Autonomous Scenario Cruise">🤖 AUTO CRUISE</button>
+            </div>
+          </div>
+
+          <!-- Bottom Controls & Throttle Slider Row -->
+          <div class="cockpit-row-controls">
+            <!-- Speed / Cruise Throttle Slider -->
+            <div class="throttle-slider-container">
+              <label for="slider-target-speed" class="throttle-label">
+                <span>THROTTLE / TARGET SPEED:</span>
+                <span class="mono throttle-val" id="val-target-speed">8.0 m/s (29 km/h)</span>
+              </label>
+              <input type="range" id="slider-target-speed" min="0" max="30" step="0.5" value="8.0">
+            </div>
+
+            <!-- Quick Speed Presets -->
+            <div class="speed-presets">
+              <button class="preset-btn stop" data-speed="0" title="Full Stop (0 km/h)">🛑 STOP</button>
+              <button class="preset-btn" data-speed="4.2" title="Slow Crawl (15 km/h)">🚶 15</button>
+              <button class="preset-btn active" data-speed="8.0" title="City Cruise (29 km/h)">🚗 29</button>
+              <button class="preset-btn" data-speed="15.0" title="Arterial (54 km/h)">⚡ 54</button>
+              <button class="preset-btn" data-speed="25.0" title="Highway (90 km/h)">🏎️ 90</button>
+            </div>
+
+            <!-- D-Pad Buttons for Touch / Mouse Driving -->
+            <div class="drive-dpad">
+              <button class="dpad-btn" id="dpad-left" title="Steer Left [A]">◄ A</button>
+              <div class="dpad-vertical">
+                <button class="dpad-btn" id="dpad-up" title="Accelerate [W]">▲ W</button>
+                <button class="dpad-btn" id="dpad-down" title="Brake [S]">▼ S</button>
+              </div>
+              <button class="dpad-btn" id="dpad-right" title="Steer Right [D]">► D</button>
+              <button class="dpad-btn reset" id="dpad-reset" title="Reset Car to Start Line">↺ RESET</button>
+            </div>
+          </div>
+
+          <!-- Keyboard Hints Footer -->
+          <div class="cockpit-hints">
+            <span>⌨️ <b>W/↑</b> Accel • <b>S/↓</b> Brake • <b>A/←</b> Steer Left • <b>D/→</b> Steer Right • <b>Space</b> Quick Stop • Drag <b>Throttle Slider</b> for Speed</span>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Right HUD Telemetry Sidebar -->
+      <aside class="sidebar-hud">
+        
+        <!-- Live KPI Card -->
+        <div class="hud-card kpi-card">
+          <div class="card-header">
+            <h3>REAL-TIME METRICS</h3>
+            <span class="badge live">LIVE</span>
+          </div>
+          <div class="kpi-grid">
+            <div class="kpi-item">
+              <span class="kpi-label">THROUGHPUT</span>
+              <span class="kpi-value cyan mono" id="kpi-fps">--</span>
+              <span class="kpi-sub">FPS</span>
+              <div class="sparkline-row">
+                <span class="sparkline-label">HISTORY</span>
+                <canvas id="sparkline-fps" width="84" height="24"></canvas>
+              </div>
+            </div>
+            <div class="kpi-item">
+              <span class="kpi-label">LATENCY</span>
+              <span class="kpi-value mono" id="kpi-latency">--</span>
+              <span class="kpi-sub">ms / frame</span>
+            </div>
+            <div class="kpi-item">
+              <span class="kpi-label">ACTIVE 3D CELLS</span>
+              <span class="kpi-value emerald mono" id="kpi-cells">--</span>
+              <span class="kpi-sub" id="kpi-reduction">~90% less vs Uniform (100m×100m)</span>
+            </div>
+            <div class="kpi-item">
+              <span class="kpi-label">ACTIVE FOVEAS</span>
+              <span class="kpi-value amber mono" id="kpi-foveas">0</span>
+              <span class="kpi-sub">Refinement Zones</span>
+            </div>
+            <div class="kpi-item">
+              <span class="kpi-label">EGO SPEED</span>
+              <span class="kpi-value cyan mono" id="kpi-ego-speed">0.0</span>
+              <span class="kpi-sub">m/s forward</span>
+            </div>
+            <div class="kpi-item">
+              <span class="kpi-label">ODOMETER</span>
+              <span class="kpi-value mono" id="kpi-odometer">0.0</span>
+              <span class="kpi-sub">m world-frame</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Latency Waterfall Card -->
+        <div class="hud-card">
+          <div class="card-header">
+            <h3>STAGE LATENCY BREAKDOWN</h3>
+            <span class="card-meta mono" id="stage-total-ms">0.0 ms</span>
+          </div>
+          <div class="latency-bars">
+            <div class="stage-row">
+              <div class="stage-info"><span>Preprocess</span><span class="mono" id="t-pre">0.0ms</span></div>
+              <div class="bar-bg"><div class="bar-fill" id="b-pre"></div></div>
+            </div>
+            <div class="stage-row">
+              <div class="stage-info"><span>Perception</span><span class="mono" id="t-perc">0.0ms</span></div>
+              <div class="bar-bg"><div class="bar-fill" id="b-perc"></div></div>
+            </div>
+            <div class="stage-row">
+              <div class="stage-info"><span>Object Tracking</span><span class="mono" id="t-trk">0.0ms</span></div>
+              <div class="bar-bg"><div class="bar-fill" id="b-trk"></div></div>
+            </div>
+            <div class="stage-row">
+              <div class="stage-info"><span>Risk & Uncertainty</span><span class="mono" id="t-risk">0.0ms</span></div>
+              <div class="bar-bg"><div class="bar-fill" id="b-risk"></div></div>
+            </div>
+            <div class="stage-row">
+              <div class="stage-info"><span>Adaptive Grid Mapping</span><span class="mono" id="t-map">0.0ms</span></div>
+              <div class="bar-bg"><div class="bar-fill" id="b-map"></div></div>
+            </div>
+            <div class="stage-row">
+              <div class="stage-info"><span>Traversability</span><span class="mono" id="t-trav">0.0ms</span></div>
+              <div class="bar-bg"><div class="bar-fill" id="b-trav"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Obstacles & Tracks -->
+        <div class="hud-card tracks-card">
+          <div class="card-header">
+            <h3>TRACKED HAZARDS & TARGETS</h3>
+            <span class="card-meta mono" id="track-count-badge">0 Tracks</span>
+          </div>
+          <div class="tracks-table-container">
+            <table class="tracks-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>CLASS</th>
+                  <th>VEL (m/s)</th>
+                  <th>THREAT</th>
+                </tr>
+              </thead>
+              <tbody id="tracks-table-body">
+                <tr><td colspan="4" class="empty-cell">No active dynamic tracks</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Visual Legend Card -->
+        <div class="hud-card legend-card">
+          <div class="card-header">
+            <h3>3D VOXEL & POINT LEGEND</h3>
+          </div>
+          <div class="legend-sections">
+            <!-- 0. Collision Risk & Threat Legend -->
+            <div class="legend-group" id="legend-risk">
+              <span class="group-title">Sequential Collision Threat Level:</span>
+              <div class="legend-chips">
+                <span class="chip"><i class="dot" style="background:#ef4444; box-shadow: 0 0 6px #ef4444;"></i> Critical (&lt;12m)</span>
+                <span class="chip"><i class="dot" style="background:#f97316;"></i> High (12-22m)</span>
+                <span class="chip"><i class="dot" style="background:#eab308;"></i> Medium (22-35m)</span>
+                <span class="chip"><i class="dot" style="background:#38bdf8;"></i> Low (&gt;35m)</span>
+              </div>
+            </div>
+
+            <!-- 1. Traversability Legend -->
+            <div class="legend-group" id="legend-traversability">
+              <span class="group-title">Dynamic Traversability &amp; Obstacles:</span>
+              <div class="legend-chips">
+                <span class="chip"><i class="dot" style="background:#10b981;"></i> Safe Corridor</span>
+                <span class="chip"><i class="dot" style="background:#f59e0b;"></i> Caution Zone</span>
+                <span class="chip"><i class="dot" style="background:#ef4444;"></i> Non-Traversable / Blocked</span>
+                <span class="chip"><i class="dot" style="background:#64748b;"></i> Unobserved</span>
+              </div>
+            </div>
+
+            <!-- 2. Semantic Classes Legend -->
+            <div class="legend-group" id="legend-semantic">
+              <span class="group-title">7-Class Macro Semantic Segmentation:</span>
+              <div class="legend-chips">
+                <span class="chip"><i class="dot" style="background:#ec4899;"></i> Pedestrian</span>
+                <span class="chip"><i class="dot" style="background:#fb923c;"></i> Cyclist</span>
+                <span class="chip"><i class="dot" style="background:#3b82f6;"></i> Vehicle / Truck</span>
+                <span class="chip"><i class="dot" style="background:#475569;"></i> Drivable Road</span>
+                <span class="chip"><i class="dot" style="background:#0ea5e9;"></i> Sidewalk / Curb</span>
+                <span class="chip"><i class="dot" style="background:#8b5cf6;"></i> Obstacle / Wall / Pole</span>
+                <span class="chip"><i class="dot" style="background:#22c55e;"></i> Vegetation / Grass</span>
+              </div>
+            </div>
+
+            <!-- 3. Elevation Hypsometric Colormap Legend -->
+            <div class="legend-group" id="legend-elevation" style="display:none">
+              <span class="group-title">Elevation Height Scale (Hypsometric Topo):</span>
+              <div class="gradient-bar-wrapper">
+                <div class="gradient-bar turbo-gradient"></div>
+                <div class="gradient-ticks mono">
+                  <span>-2.0m</span>
+                  <span>-0.5m</span>
+                  <span>0.0m</span>
+                  <span>+1.5m</span>
+                  <span>+3.5m</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. LiDAR Intensity / Reflectivity Legend -->
+            <div class="legend-group" id="legend-intensity" style="display:none">
+              <span class="group-title">Laser Return Reflectivity (Heated Metal):</span>
+              <div class="gradient-bar-wrapper">
+                <div class="gradient-bar intensity-gradient"></div>
+                <div class="gradient-ticks mono">
+                  <span>0.0 (Asphalt)</span>
+                  <span>0.25 (Diffusive)</span>
+                  <span>0.6 (Obstacle)</span>
+                  <span>0.85 (Reflective)</span>
+                  <span>1.0 (Retro)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5. Resolution Quadtree Legend -->
+            <div class="legend-group" id="legend-resolution" style="display:none">
+              <span class="group-title">Variable Resolution Tiers (0.05m – 0.50m):</span>
+              <div class="res-tiers-grid">
+                <div class="res-tier-item cyan">
+                  <span class="tier-label">0.05m (Fovea [0-10m])</span>
+                  <span class="tier-count mono" id="res-cnt-5">-- cells</span>
+                </div>
+                <div class="res-tier-item lime">
+                  <span class="tier-label">0.10m (Fine [10-25m])</span>
+                  <span class="tier-count mono" id="res-cnt-10">-- cells</span>
+                </div>
+                <div class="res-tier-item gold">
+                  <span class="tier-label">0.25m (Far [25-50m])</span>
+                  <span class="tier-count mono" id="res-cnt-20">-- cells</span>
+                </div>
+                <div class="res-tier-item indigo">
+                  <span class="tier-label">0.40m (Periphery [50-100m])</span>
+                  <span class="tier-count mono" id="res-cnt-50">-- cells</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </aside>
+    </main>
+
+  </div>
+
+  <script src="/static/app.js?v=20260906_classic_3d_v7"></script>
+</body>
+</html>

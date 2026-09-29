@@ -1,0 +1,11 @@
+numpy
+scipy
+pyyaml
+open3d; python_version < '3.13'
+pytest
+pytest-cov
+fastapi
+uvicorn
+websockets
+matplotlib
+psutil

@@ -1,0 +1,258 @@
+# ==============================================================================
+# Fovea-LiDAR Default System Configuration
+# ==============================================================================
+# NOTE: All values below are placeholder defaults and NOT tuned parameters.
+#       Specific tuning should be performed based on sensor characteristics
+#       and benchmark evaluations.
+# ==============================================================================
+
+# Core LiDAR mapping and occupancy grid parameters
+mapping:
+  min_resolution: 0.05       # Minimum voxel/grid resolution in meters (default, not tuned)
+  max_resolution: 0.40       # Maximum coarse resolution in meters (default, not tuned)
+  max_range: 50.0            # Maximum effective sensor range in meters (default, not tuned)
+  min_range: 0.5             # Minimum sensor blind zone in meters (default, not tuned)
+  frame_id: "base_link"      # Reference coordinate frame (default, not tuned)
+
+# Adaptive resolution zones definitions
+resolution_zones:
+  - name: "fovea"
+    distance_min: 0.0        # Range start in meters (default, not tuned)
+    distance_max: 10.0       # Range end in meters (default, not tuned)
+    target_resolution: 0.05  # Highest resolution focus in meters (default, not tuned)
+  - name: "mid_range"
+    distance_min: 10.0       # Range start in meters (default, not tuned)
+    distance_max: 25.0       # Range end in meters (default, not tuned)
+    target_resolution: 0.10  # Medium resolution in meters (default, not tuned)
+  - name: "far_field"
+    distance_min: 25.0       # Range start in meters (default, not tuned)
+    distance_max: 50.0       # Range end in meters (default, not tuned)
+    target_resolution: 0.25  # Coarser resolution in meters (default, not tuned)
+  - name: "periphery"
+    distance_min: 50.0       # Range start in meters (default, not tuned)
+    distance_max: 100.0      # Range end in meters (default, not tuned)
+    target_resolution: 0.40  # Lowest resolution periphery in meters (default, not tuned)
+
+# Semantic class definitions allowed in the system (14 fine-grained classes)
+semantic_classes:
+  - "ROAD"
+  - "SIDEWALK"
+  - "GRASS"
+  - "OTHER_TERRAIN"
+  - "CURB"
+  - "POTHOLE"
+  - "VEHICLE"
+  - "PEDESTRIAN"
+  - "CYCLIST"
+  - "TRUCK"
+  - "WALL"
+  - "POLE"
+  - "VEGETATION"
+  - "UNKNOWN_OBSTACLE"
+
+# 7-Class Macro Semantic Taxonomy (Standard Autonomous Benchmark Taxonomy)
+# Maps fine-grained classes into the 7 primary evaluation classes:
+macro_semantic_classes:
+  ROAD: ["ROAD", "OTHER_TERRAIN"]
+  SIDEWALK: ["SIDEWALK", "CURB"]
+  VEHICLE: ["VEHICLE", "TRUCK"]
+  PEDESTRIAN: ["PEDESTRIAN"]
+  CYCLIST: ["CYCLIST"]
+  OBSTACLE: ["WALL", "POLE", "POTHOLE", "UNKNOWN_OBSTACLE"]
+  VEGETATION: ["VEGETATION", "GRASS"]
+
+# Reference Key Metrics Comparison Targets (100m x 100m Operational Area):
+# - Baseline: Uniform 10 cm (0.1m) -> 1,000,000 cells (~400 MB), 100-150 ms (~6-10 FPS)
+# - Fovea-LiDAR: 0.05-0.5m variable -> ~80,000-100,000 cells (~35-50 MB, ~90% less), 20-30 ms (~30-50 FPS)
+
+# Semantic-driven foveation refinement triggers
+semantic_foveation:
+  enabled: true
+  min_resolution: 0.05                # R_min target resolution in meters
+  max_resolution: 0.40                # R_max coarse resolution in meters
+  alpha: 0.007                        # Distance coefficient alpha
+  gamma: 1.0                          # Distance exponent gamma
+  fovea_radius: 2.0                   # Spatial radius of foveation patch in meters
+  fovea_activation_threshold: 0.02    # Minimum resolution improvement (m) to activate overlay
+  confidence_threshold: 0.5           # Detection confidence threshold
+  dynamic_boost: 1.0                  # Boost factor for dynamic moving objects
+  complexity_reference_variance: 0.05 # Reference elevation variance (m^2) for C=1.0
+  weights:
+    distance_weight: 0.30
+    object_weight: 0.50
+    dynamic_weight: 0.30
+    complexity_weight: 0.20
+    risk_weight: 0.40
+    uncertainty_weight: 0.20
+  semantic_importance:
+    PEDESTRIAN: 1.0
+    CYCLIST: 0.95
+    VEHICLE: 0.90
+    TRUCK: 0.85
+    UNKNOWN_OBSTACLE: 0.80
+    POTHOLE: 0.60
+    CURB: 0.50
+    POLE: 0.40
+    WALL: 0.30
+    ROAD: 0.05
+    SIDEWALK: 0.10
+    GRASS: 0.10
+    OTHER_TERRAIN: 0.10
+
+
+# Dynamic collision risk refinement triggers
+risk_refinement:
+  enabled: true                       # Master toggle for risk-driven foveation
+  max_distance: 40.0                  # Maximum proximity range (m) where distance risk scales to 0
+  max_velocity: 10.0                  # Speed (m/s) at which kinematic velocity risk saturates to 1.0
+  approach_speed_threshold: 0.1       # Speed threshold (m/s) below which approach direction is neutral/static
+  confidence_discount: true          # Whether tracking confidence discounts raw risk score
+  confidence_discount_floor: 0.2      # Minimum floor multiplier for low-confidence tracks
+  weights:
+    distance_weight: 0.35             # Proximity to ego sensor origin
+    class_weight: 0.20                # Vulnerability / semantic hazard weight
+    velocity_weight: 0.20             # Absolute speed hazard
+    approach_weight: 0.25             # Ego-directed approach vector hazard (dot product)
+  class_hazard_table:
+    PEDESTRIAN: 1.00                  # Highly vulnerable road user (highest hazard)
+    CYCLIST: 0.90                     # Vulnerable road user with medium speed
+    VEHICLE: 0.60                     # Heavy dynamic object (moderate hazard)
+    TRUCK: 0.70                       # High-mass commercial vehicle
+    UNKNOWN_OBSTACLE: 0.50            # Unidentified obstacle
+    POLE: 0.30                        # Static vertical obstacle
+    WALL: 0.20                        # Static boundary obstacle
+    POTHOLE: 0.40                     # Surface negative obstacle
+    CURB: 0.30                        # Surface step obstacle
+    ROAD: 0.05                        # Nominal traversable surface
+    SIDEWALK: 0.05                    # Pedestrian walkway
+    GRASS: 0.05                       # Compliant surface
+    OTHER_TERRAIN: 0.05               # Default low terrain hazard
+  thresholds:
+    critical: 0.75                    # Risk score threshold for CRITICAL level
+    high: 0.50                        # Risk score threshold for HIGH level
+    medium: 0.25                      # Risk score threshold for MEDIUM level
+  bounds_scaling:
+    LOW: 1.0                          # Bounding region radius multiplier for LOW risk
+    MEDIUM: 1.5                       # Bounding region radius multiplier for MEDIUM risk
+    HIGH: 2.0                         # Bounding region radius multiplier for HIGH risk
+    CRITICAL: 2.5                     # Bounding region radius multiplier for CRITICAL risk
+
+# Occupancy and semantic uncertainty refinement triggers
+uncertainty_refinement:
+  enabled: true                       # Master toggle for uncertainty-driven foveation
+  weights:
+    semantic_weight: 0.50             # Weight for semantic prediction ambiguity (1 - confidence)
+    occupancy_weight: 0.30            # Weight for occupancy ambiguity (1 - 2*|p - 0.5|)
+    staleness_weight: 0.20            # Weight for observation staleness
+  staleness_tau: 5.0                  # Time constant (s) for cell observation staleness normalization
+  entropy_threshold: 0.7              # Shannon entropy threshold for binary classification
+  min_observations: 3                 # Minimum observations needed before confidence matures
+
+# Dynamic traversability engine configuration
+traversability:
+  enabled: true                       # Master toggle for traversability evaluation
+  default_threshold: 0.5              # Minimum score to be considered traversable/navigable
+  uncertainty_threshold: 0.70         # Threshold above which cells remain strictly UNKNOWN
+  dynamic_penalties:
+    LOW: 0.50                         # Score penalty factor for LOW risk dynamic obstacles
+    MEDIUM: 0.60                      # Score penalty factor for MEDIUM risk dynamic obstacles
+    HIGH: 0.90                        # Score penalty factor for HIGH risk dynamic obstacles
+    CRITICAL: 1.00                    # Score penalty factor for CRITICAL risk dynamic obstacles
+
+# Point cloud preprocessing pipeline stages and parameters
+preprocessing:
+  enabled: true
+  stage_order:
+    - "coordinate_transform"
+    - "range_filter"
+    - "height_filter"
+    - "voxel_downsample"
+    - "statistical_outlier_removal"
+    - "radius_outlier_removal"
+    - "ground_candidate_extraction"
+  coordinate_transform:
+    enabled: true
+    matrix:
+      - [1.0, 0.0, 0.0, 0.0]
+      - [0.0, 1.0, 0.0, 0.0]
+      - [0.0, 0.0, 1.0, 0.0]
+      - [0.0, 0.0, 0.0, 1.0]
+  range_filter:
+    enabled: true
+    min_range: 0.5    # meters (Euclidean distance minimum)
+    max_range: 50.0   # meters (Euclidean distance maximum)
+  height_filter:
+    enabled: true
+    min_z: -3.0       # meters (vertical lower bound)
+    max_z: 4.0        # meters (vertical upper bound)
+  voxel_downsample:
+    enabled: true
+    voxel_size: 0.10  # meters (grid cell resolution for decimation)
+  statistical_outlier_removal:
+    enabled: false    # disabled by default for latency, enabled on demand
+    nb_neighbors: 20
+    std_ratio: 2.0
+  radius_outlier_removal:
+    enabled: false    # disabled by default for latency, enabled on demand
+    radius: 0.5       # meters
+    min_neighbors: 4
+  ground_candidate_extraction:
+    enabled: true
+    distance_threshold: 0.15          # meters (plane inlier distance)
+    max_iterations: 100               # RANSAC iterations
+    upright_normal_threshold: 0.8     # Minimum cos(theta) with Z-axis
+
+# Semantic perception module configuration
+perception:
+  backend: "mock"                     # Supported: "mock" (rules), "pretrained" (A1), "custom"
+  confidence_threshold: 0.5           # Detection confidence threshold
+  mock_model:
+    ground_threshold: 0.20            # Points with |z| <= 0.20m treated as ROAD
+    cluster_radius: 0.75              # Euclidean cluster grouping radius in meters
+    min_cluster_points: 3             # Minimum points to form an obstacle cluster
+    sparse_point_threshold: 18        # Threshold for ambiguous/sparse low-confidence obstacles
+
+# Terrain traversability and hazard analysis configuration
+terrain:
+  enabled: true
+  min_semantic_confidence: 0.50          # Below this, terrain is marked UNKNOWN
+  max_safe_slope: 0.15                   # Maximum slope (dz/dxy) considered SAFE
+  max_caution_slope: 0.35                # Maximum slope (dz/dxy) before NON_TRAVERSABLE
+  max_safe_roughness: 0.06               # Maximum roughness (m) considered SAFE
+  max_caution_roughness: 0.18            # Maximum roughness (m) before NON_TRAVERSABLE
+  curb_height_threshold: 0.08            # Minimum step discontinuity (m) for curb detection / CAUTION
+  non_traversable_height_threshold: 0.25 # Height step (m) triggering NON_TRAVERSABLE
+  pothole_depth_threshold: 0.08          # Negative elevation drop (m) for pothole detection
+
+# Object extraction and clustering configuration
+objects:
+  enabled: true
+  cluster_distance_threshold: 1.0     # Euclidean clustering distance threshold in meters
+  min_cluster_points: 10              # Minimum points required to form a valid detected object
+  object_classes:                     # Allowed object-like semantic classes for clustering
+    - "VEHICLE"
+    - "PEDESTRIAN"
+    - "CYCLIST"
+    - "TRUCK"
+    - "WALL"
+    - "POLE"
+    - "UNKNOWN_OBSTACLE"
+  dynamic_classes:                    # Classes initialized with dynamic=True
+    - "VEHICLE"
+    - "PEDESTRIAN"
+    - "CYCLIST"
+    - "TRUCK"
+
+# Multi-object tracking and temporal decay configuration
+tracking:
+  enabled: true
+  gating_distance: 2.5              # Maximum Euclidean distance (m) for detection-to-track matching
+  max_missed_frames: 3              # Maximum frames to coast unmatched before track removal
+  min_track_confidence: 0.25        # Minimum confidence threshold before track removal
+  confidence_decay_rate: 0.20       # Linear confidence decay per unmatched frame (dimensionless)
+  static_speed_threshold: 0.30      # Speed threshold (m/s) to classify object as dynamic
+  min_moving_frames: 2              # Consecutive moving frames needed to confirm dynamic state
+  max_history_len: 50               # Maximum historical positions retained per track
+  process_noise_std: 1.0            # Process noise standard deviation (m/s^2) for Kalman filter
+  measurement_noise_std: 0.15       # Measurement noise standard deviation (m) for Kalman filter
+

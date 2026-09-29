@@ -1,0 +1,31 @@
+# ==============================================================================
+# Fovea-LiDAR Benchmark Framework Configuration
+# ==============================================================================
+
+# Scenarios to evaluate across ablation modes
+scenarios:
+  - "multi_object_dense"
+  - "vehicle_crossing"
+  - "pedestrian_at_distance"
+  - "empty_road"
+  - "object_disappearing"
+  - "low_confidence_obstacle"
+  - "resolution_boundary_stress"
+
+# Ablation study modes to benchmark
+modes:
+  - "mode_1_uniform"
+  - "mode_2_distance_only"
+  - "mode_3_distance_semantic"
+  - "mode_4_distance_semantic_risk"
+  - "mode_5_full"
+
+# Evaluation parameters
+num_frames: 10
+warmup_runs: 1
+
+# Output paths
+output_dir: "experiments"
+results_json: "experiments/benchmark_results.json"
+results_csv: "experiments/benchmark_results.csv"
+plots_dir: "experiments/plots"

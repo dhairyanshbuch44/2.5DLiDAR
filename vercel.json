@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "public": true,
+  "cleanUrls": true,
+  "builds": [
+    {
+      "src": "dashboard/frontend/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/dashboard/frontend/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/dashboard/frontend/index.html"
+    }
+  ]
+}

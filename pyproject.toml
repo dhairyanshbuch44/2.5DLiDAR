@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fovea-lidar"
+version = "0.1.0"
+description = "Adaptive foveated LiDAR mapping system"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pyyaml",
+    "open3d; python_version < '3.13'",
+    "pytest",
+    "pytest-cov",
+    "fastapi",
+    "uvicorn",
+    "websockets",
+    "matplotlib",
+    "psutil",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "cpu_only: mark test verifying CPU-only execution without GPU or deep learning libraries",
+]
